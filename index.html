@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Metal Slug 2D - Perfect Pixel Forest</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * { user-select: none; box-sizing: border-box; -webkit-touch-callout: none; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #87ceeb; font-family: 'Press Start 2P', cursive;
+        }
+        canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; width: 100%; height: 100%; }
+        .arcade-btn {
+            background: linear-gradient(180deg, #f59e0b 0%, #d97706 50%, #92400e 100%);
+            border: 3px solid #fef3c7;
+            box-shadow: 0 6px 0 #451a03, 0 10px 15px rgba(0,0,0,0.6);
+            transition: all 0.1s ease;
+        }
+        .arcade-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #451a03, 0 4px 8px rgba(0,0,0,0.6);
+        }
+        .touch-btn {
+            background: rgba(255, 255, 255, 0.25);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(4px);
+        }
+        .touch-btn:active {
+            background: rgba(250, 204, 21, 0.6);
+            border-color: #facc15;
+        }
+    </style>
+</head>
+<body class="relative">
+
+    <!-- 2D Canvas Game Screen -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Top HUD Overlay -->
+    <div class="absolute top-0 left-0 w-full p-4 pointer-events-none flex justify-between items-start z-10 text-[10px] sm:text-xs text-yellow-300">
+        <div class="bg-black/85 border-2 border-yellow-500 rounded-xl p-3 shadow-lg flex flex-col gap-1.5">
+            <div id="hud-health">HEALTH: 🦹‍♂️🦹‍♂️🦹‍♂️🦹‍♂️🦹‍♂️</div>
+            <div id="hud-weapon">WEAPON: PISTOL [∞]</div>
+            <div id="hud-bombs">GRENADES: 💣 10</div>
+        </div>
+
+        <div class="bg-black/85 border-2 border-emerald-500 rounded-xl p-3 shadow-lg text-center">
+            <div class="text-emerald-400 mb-1">PLAYER: PERFECT</div>
+            <div id="hud-distance" class="text-white text-sm">DISTANCE: <span id="dist-val">0</span>m</div>
+        </div>
+
+        <div class="bg-black/85 border-2 border-blue-500 rounded-xl p-3 shadow-lg text-right">
+            <div id="hud-hostages">POW: 🧔🏼 0</div>
+            <div id="hud-score" class="text-yellow-400 mt-1">000000</div>
+        </div>
+    </div>
+
+    <!-- Announcement Popup -->
+    <div id="announcement" class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20 transition-all duration-300 opacity-0 scale-75 text-center">
+        <div id="announcement-text" class="text-xs sm:text-2xl text-yellow-400 bg-black/90 px-6 py-3 rounded-xl border-2 border-yellow-400 shadow-2xl">
+            HEAVY MACHINE GUN!
+        </div>
+    </div>
+
+    <!-- Touch & Virtual Controls -->
+    <div class="absolute bottom-4 left-0 w-full px-4 flex justify-between items-end pointer-events-none z-10">
+        <div class="flex gap-3 pointer-events-auto">
+            <button id="btn-left" class="touch-btn w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg">◀</button>
+            <button id="btn-right" class="touch-btn w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg">▶</button>
+        </div>
+        <div class="hidden md:flex bg-black/70 px-4 py-2 rounded-full text-[10px] text-gray-300 gap-3 border border-white/25">
+            <span>[A/D or Arrows] Move</span>
+            <span>[W/Space] Jump</span>
+            <span>[F/J] Shoot</span>
+        </div>
+        <div class="flex gap-3 pointer-events-auto">
+            <button id="btn-jump" class="touch-btn w-14 h-14 rounded-2xl flex items-center justify-center text-cyan-400 text-lg font-bold shadow-lg">▲</button>
+            <button id="btn-shoot" class="touch-btn w-16 h-16 rounded-2xl flex items-center justify-center text-red-400 text-2xl font-bold shadow-lg bg-red-900/50">🔥</button>
+        </div>
+    </div>
+
+    <!-- Start Modal -->
+    <div id="overlay" class="absolute inset-0 bg-black/90 flex items-center justify-center z-30 p-4">
+        <div class="max-w-md w-full bg-stone-900 border-4 border-yellow-500 rounded-3xl p-6 text-center shadow-2xl">
+            <div class="text-amber-500 text-[10px] mb-2">ENDLESS DAYLIGHT FOREST CAMPAIGN</div>
+            <h1 class="text-xl sm:text-2xl text-yellow-400 mb-3 leading-relaxed">WELCOME PERFECT</h1>
+            <p class="text-gray-300 text-[10px] sm:text-xs leading-relaxed mb-6">
+                Endless daylight forest run! Featuring bright blue skies, blue clouds, glowing sun, pitch-black grass silhouettes, smart pixel characters, and dynamically randomized run-down background houses and broken ruins!
+            </p>
+            <button onclick="startGame()" class="arcade-btn text-xs sm:text-sm text-white px-6 py-4 rounded-2xl w-full cursor-pointer">
+                MISSION START!
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Audio Synth
+        class SoundFX {
+            constructor() { this.ctx = null; }
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+            playShoot() {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.frequency.setValueAtTime(350, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.08);
+                    g.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                    g.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                    osc.connect(g); g.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+                } catch(e){}
+            }
+            playExplosion() {
+                if (!this.ctx) return;
+                try {
+                    const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.3, this.ctx.sampleRate);
+                    const data = buf.getChannelData(0);
+                    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+                    const src = this.ctx.createBufferSource();
+                    src.buffer = buf;
+                    const filt = this.ctx.createBiquadFilter();
+                    filt.type = 'lowpass'; filt.frequency.value = 250;
+                    const g = this.ctx.createGain();
+                    g.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                    src.connect(filt); filt.connect(g); g.connect(this.ctx.destination);
+                    src.start(); src.stop(this.ctx.currentTime + 0.3);
+                } catch(e){}
+            }
+            playPowerup() {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.18);
+                    g.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    g.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.18);
+                    osc.connect(g); g.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + 0.18);
+                } catch(e){}
+            }
+        }
+        const sfx = new SoundFX();
+
+        let cameraX = 0;
+        let gameState = 'MENU';
+        let score = 0;
+        let hostagesRescued = 0;
+        let maxSpawnX = 0;
+
+        const keys = { left: false, right: false, up: false, jump: false, shoot: false };
+
+        let player = null;
+        let platforms = [];
+        let stairs = [];
+        let ladders = [];
+        let obstacles = [];
+        let enemies = [];
+        let hostages = [];
+        let bullets = [];
+        let pickups = [];
+        let backgroundStructures = [];
+        let trees = [];
+        let vehicles = []; // Moving military trucks, heavy tanks & jet planes
+
+        // ============================================================================
+        // HIGH-PERFORMANCE MICRO-PIXEL TEXTURE & SPRITE ENGINE (ZERO LAG)
+        // Pre-renders fine 2x2 pixel-art textures, shaded human sprites, organic trees,
+        // and weathered terrain onto offscreen canvases for hardware-accelerated drawing.
+        // ============================================================================
+        const ArtCache = {
+            groundTile: null,
+            cloudSprites: [],
+            treeVariants: [],
+            sprites: {}
+        };
+
+        // Helper for deterministic pseudo-random pixel dithering
+        function hashNoise(x, y) {
+            let n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+            return n - Math.floor(n);
+        }
+
+        function initMicroPixelAssets() {
+            const P = 2; // Micro-pixel size (2x2 screen pixels)
+
+            // 1. Pre-render Seamless Detailed Brown Earth & Root Ground Tile (256x150)
+            const gCanvas = document.createElement('canvas');
+            gCanvas.width = 256;
+            gCanvas.height = 150;
+            const gCtx = gCanvas.getContext('2d');
+
+            for (let y = 0; y < 150; y += P) {
+                for (let x = 0; x < 256; x += P) {
+                    const n = hashNoise(x, y);
+                    const wave = Math.sin(x * 0.08) * 4;
+                    if (y < 6 + wave * 0.3) {
+                        // Top dark grass silhouette & surface turf
+                        gCtx.fillStyle = n > 0.4 ? '#0a0f0a' : '#1b2618';
+                    } else if (y < 22 + wave) {
+                        // Upper rich soil crust with small pebbles
+                        gCtx.fillStyle = n > 0.75 ? '#7c5333' : (n > 0.3 ? '#5c3a21' : '#4a2e18');
+                    } else {
+                        // Deep textured earth strata with pixel rocks & roots
+                        if (n > 0.92) gCtx.fillStyle = '#6b4c35'; // Embedded stone highlight
+                        else if (n > 0.84) gCtx.fillStyle = '#2b1a0e'; // Dark soil pocket
+                        else if (n > 0.45) gCtx.fillStyle = '#4a2e18';
+                        else gCtx.fillStyle = '#3d2512';
+                    }
+                    gCtx.fillRect(x, y, P, P);
+                }
+            }
+            // Add larger pixel stones & pitch-black surface grass blades
+            for (let x = 0; x < 256; x += 4) {
+                const bladeH = 4 + Math.floor(hashNoise(x, 1) * 8);
+                gCtx.fillStyle = '#090d09';
+                gCtx.fillRect(x, 0, 2, bladeH);
+            }
+            ArtCache.groundTile = gCanvas;
+
+            // 2. Pre-render Detailed Pixel-Art Blue Clouds
+            for (let c = 0; c < 3; c++) {
+                const cCanvas = document.createElement('canvas');
+                cCanvas.width = 160;
+                cCanvas.height = 80;
+                const cCtx = cCanvas.getContext('2d');
+                const puffs = [
+                    { cx: 45, cy: 48, r: 24 },
+                    { cx: 78, cy: 36, r: 30 },
+                    { cx: 112, cy: 46, r: 25 },
+                    { cx: 62, cy: 52, r: 22 },
+                    { cx: 95, cy: 52, r: 22 }
+                ];
+                for (let y = 0; y < 80; y += P) {
+                    for (let x = 0; x < 160; x += P) {
+                        let inside = false;
+                        let topDist = 999;
+                        for (let pf of puffs) {
+                            const dx = x - pf.cx;
+                            const dy = y - pf.cy;
+                            const d = Math.sqrt(dx * dx + dy * dy);
+                            if (d <= pf.r + (hashNoise(x + c * 10, y) * 4 - 2)) {
+                                inside = true;
+                                topDist = Math.min(topDist, (y - (pf.cy - pf.r)) / (pf.r * 2));
+                            }
+                        }
+                        if (inside) {
+                            const dither = hashNoise(x, y) * 0.15;
+                            if (topDist + dither < 0.35) cCtx.fillStyle = '#eff6ff'; // Bright sunlit top
+                            else if (topDist + dither < 0.72) cCtx.fillStyle = '#bfdbfe'; // Mid blue cloud
+                            else cCtx.fillStyle = '#93c5fd'; // Shaded blue underside
+                            cCtx.fillRect(x, y, P, P);
+                        }
+                    }
+                }
+                ArtCache.cloudSprites.push(cCanvas);
+            }
+
+            // 3. Pre-render 5 Organic, Gnarled Pixel-Art Forest Tree Variations
+            for (let v = 0; v < 5; v++) {
+                const tCanvas = document.createElement('canvas');
+                tCanvas.width = 240;
+                tCanvas.height = 400;
+                const tCtx = tCanvas.getContext('2d');
+                const centerX = 120;
+                const baseY = 396;
+                const trunkH = 260 + v * 15;
+                const topY = baseY - trunkH;
+
+                // Draw organic curved pixel trunk & flared roots
+                for (let y = topY; y <= baseY; y += P) {
+                    const progress = (y - topY) / trunkH; // 0 at top, 1 at base
+                    const curve = Math.sin(progress * Math.PI * 1.5 + v) * (8 - progress * 4);
+                    let halfW = 6 + progress * 9;
+                    if (progress > 0.82) {
+                        halfW += Math.pow((progress - 0.82) * 5.5, 2) * 14; // Root flare
+                    }
+                    const rowCenterX = centerX + curve;
+                    for (let x = rowCenterX - halfW; x <= rowCenterX + halfW; x += P) {
+                        const relX = (x - (rowCenterX - halfW)) / (halfW * 2);
+                        const barkNoise = hashNoise(Math.floor(x / P), Math.floor(y / 6) + v * 20);
+                        if (relX < 0.15 || relX > 0.88) tCtx.fillStyle = '#1f120b'; // Bark outline
+                        else if (relX < 0.38 && barkNoise > 0.3) tCtx.fillStyle = '#6d4c41'; // Sunlit bark ridge
+                        else if (barkNoise > 0.55) tCtx.fillStyle = '#4e342e';
+                        else if (barkNoise > 0.25) tCtx.fillStyle = '#3e2723';
+                        else tCtx.fillStyle = '#271710'; // Deep bark crevice
+                        tCtx.fillRect(Math.floor(x / P) * P, Math.floor(y / P) * P, P, P);
+                    }
+                }
+
+                // Generate organic pixel branches & multi-layered leaf canopies
+                const branchConfigs = [
+                    { startY: baseY - trunkH * 0.45, dir: -1, len: 55 + (v % 2) * 15, angle: 0.55 },
+                    { startY: baseY - trunkH * 0.62, dir: 1, len: 60 + ((v + 1) % 2) * 12, angle: 0.5 },
+                    { startY: baseY - trunkH * 0.78, dir: -1, len: 48, angle: 0.45 },
+                    { startY: baseY - trunkH * 0.88, dir: 1, len: 44, angle: 0.4 }
+                ];
+
+                const foliageClusters = [];
+                branchConfigs.forEach((b, bi) => {
+                    const steps = 28;
+                    let bx = centerX;
+                    let by = b.startY;
+                    for (let s = 0; s <= steps; s++) {
+                        const t = s / steps;
+                        bx = centerX + b.dir * t * b.len;
+                        by = b.startY - Math.sin(t * Math.PI * 0.6) * (b.len * b.angle);
+                        const bw = Math.max(2, (1 - t * 0.65) * 6);
+                        for (let py = -bw; py <= bw; py += P) {
+                            tCtx.fillStyle = py < 0 ? '#5d4037' : '#271710';
+                            tCtx.fillRect(Math.floor(bx / P) * P, Math.floor((by + py) / P) * P, P, P);
+                        }
+                    }
+                    foliageClusters.push({ x: bx, y: by - 6, r: 34 + (bi % 2) * 8 });
+                    foliageClusters.push({ x: (centerX + bx) * 0.5, y: by - 14, r: 28 });
+                });
+
+                // Crown canopy clusters
+                foliageClusters.push({ x: centerX, y: topY - 10, r: 48 });
+                foliageClusters.push({ x: centerX - 32, y: topY + 6, r: 36 });
+                foliageClusters.push({ x: centerX + 32, y: topY + 8, r: 36 });
+                foliageClusters.push({ x: centerX, y: topY - 34, r: 34 });
+
+                // Render individual pixel leaf clusters with 5 shades of organic foliage
+                foliageClusters.forEach(fc => {
+                    const minX = Math.max(0, Math.floor((fc.x - fc.r - 6) / P) * P);
+                    const maxX = Math.min(238, Math.ceil((fc.x + fc.r + 6) / P) * P);
+                    const minY = Math.max(0, Math.floor((fc.y - fc.r - 6) / P) * P);
+                    const maxY = Math.min(398, Math.ceil((fc.y + fc.r + 6) / P) * P);
+
+                    for (let y = minY; y <= maxY; y += P) {
+                        for (let x = minX; x <= maxX; x += P) {
+                            const dx = x - fc.x;
+                            const dy = y - fc.y;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            const edgeJagger = (hashNoise(x + v * 7, y) - 0.5) * 14;
+                            if (dist <= fc.r + edgeJagger) {
+                                const lightVal = ((dy / fc.r) * 0.55 + (dx / fc.r) * 0.25) + (hashNoise(x * 2, y * 2) - 0.5) * 0.45;
+                                if (dist > fc.r + edgeJagger - 2.5) tCtx.fillStyle = '#091c12'; // Crisp dark leaf edge
+                                else if (lightVal < -0.28) tCtx.fillStyle = '#52b788'; // Sunlit top leaf tips
+                                else if (lightVal < 0.0) tCtx.fillStyle = '#2d6a4f';  // Bright mid-canopy
+                                else if (lightVal < 0.28) tCtx.fillStyle = '#1b4332'; // Rich forest green
+                                else tCtx.fillStyle = '#0d2818';                      // Deep canopy shadow
+                                tCtx.fillRect(x, y, P, P);
+                            }
+                        }
+                    }
+                });
+
+                ArtCache.treeVariants.push(tCanvas);
+            }
+
+            // 4. Pre-render Detailed 16x24 Micro-Pixel Human Sprites (Scaled 2x to 32x48)
+            const palette = {
+                '.': null,
+                'K': '#111827', // Dark outline / boots / gun barrel
+                'G': '#374151', // Gunmetal highlight
+                'S': '#f5cba7', // Skin highlight
+                's': '#d99b66', // Skin shadow
+                'Y': '#fde047', // Yellow bandana
+                'y': '#ca8a04', // Bandana knot/shadow
+                'H': '#334155', // Commando helmet
+                'h': '#1e293b', // Helmet shadow
+                'R': '#dc2626', // Red tactical vest
+                'r': '#991b1b', // Vest shading / pouches
+                'P': '#4d7c0f', // Olive cargo pants
+                'p': '#365314', // Pants shadow
+                'E': '#78716c', // Enemy helmet
+                'e': '#44403c', // Enemy helmet shadow
+                'U': '#92400e', // Enemy desert/forest uniform
+                'u': '#5c2808', // Enemy uniform shadow
+                'B': '#eab308', // POW blonde hair / beard
+                'b': '#a16207', // Hair shadow
+                'W': '#a8a29e', // POW ragged tunic
+                'w': '#78716c', // Tunic shadow
+                'C': '#e7cba9'  // Rope bindings
+            };
+
+            function bakeSprite(grid) {
+                const c = document.createElement('canvas');
+                c.width = 36;
+                c.height = 48;
+                const cx = c.getContext('2d');
+                for (let r = 0; r < grid.length; r++) {
+                    const row = grid[r];
+                    for (let col = 0; col < row.length; col++) {
+                        const ch = row[col];
+                        if (palette[ch]) {
+                            cx.fillStyle = palette[ch];
+                            cx.fillRect(col * 2, r * 2, 2, 2);
+                        }
+                    }
+                }
+                return c;
+            }
+
+            const playerBase = [
+                "....KKKKKK......",
+                "...KHHHHHHK.....",
+                "..KHHHHHHHHK....",
+                "..KYYYYYYYYK....",
+                "..ySSSSSSSSK....",
+                ".yySSSKSSKSSK...",
+                ".K.SSSSSSSSsK...",
+                "...KssssKssK....",
+                "...KRRRRRRRRK...",
+                "..KRRRRrRRRRRK..",
+                "..KSSSRrRRKGGGGG",
+                "..KssSRrRKKKKKKK",
+                "...KRRrRRRRKGG..",
+                "...KrrrrrrrrK...",
+                "...KKKKKKKKKK...",
+                "...KPPPPPPPPK...",
+                "...KPPPPpPPPK...",
+                "...KPPPpKPPPp...",
+                "...KPPp.KPPp....",
+                "...KPPp.KPPp....",
+                "...KPPp.KPPp....",
+                "...KKKK.KKKK....",
+                "...KKKK.KKKKK...",
+                "...KKKK.KKKKK..."
+            ];
+
+            const playerRun = [
+                "....KKKKKK......",
+                "...KHHHHHHK.....",
+                "..KHHHHHHHHK....",
+                "..KYYYYYYYYK....",
+                "..ySSSSSSSSK....",
+                ".yySSSKSSKSSK...",
+                ".K.SSSSSSSSsK...",
+                "...KssssKssK....",
+                "...KRRRRRRRRK...",
+                "..KRRRRrRRRRRK..",
+                "..KSSSRrRRKGGGGG",
+                "..KssSRrRKKKKKKK",
+                "...KRRrRRRRKGG..",
+                "...KrrrrrrrrK...",
+                "...KKKKKKKKKK...",
+                "...KPPPPPPPPK...",
+                "..KPPPPpPPPPPK..",
+                "..KPPPp..KPPPp..",
+                ".KPPPp....KPPPp.",
+                ".KPPp......KPPp.",
+                ".KKKK......KKKK.",
+                ".KKKKK.....KKKKK",
+                "................",
+                "................"
+            ];
+
+            const enemyBase = [
+                "....KKKKKK......",
+                "...KEEEEEEK.....",
+                "..KEEEEEEEEK....",
+                "..KeeeeeeeeK....",
+                "...KSSSSSSSK....",
+                "...KSSKSSKSSK...",
+                "...KssssKsssK...",
+                "....KssssssK....",
+                "...KUUUUUUUUK...",
+                "..KUUUUuUUUUUK..",
+                "..KUUUUuUUKGGGGG",
+                "..KSSSUuUKKKKKKK",
+                "...KssUUUUUUK...",
+                "...KuuuuuuuuK...",
+                "...KKKKKKKKKK...",
+                "...KuuuuuuuuK...",
+                "...KuuuKuuuuK...",
+                "...KuuuK.Kuuu...",
+                "...KuuK..KuuK...",
+                "...KuuK..KuuK...",
+                "...KuuK..KuuK...",
+                "...KKKK..KKKK...",
+                "...KKKK..KKKKK..",
+                "...KKKK..KKKKK.."
+            ];
+
+            const hostageTied = [
+                "....KKKKKK......",
+                "...KBBBBBBK.....",
+                "..KBBBBBBBBK....",
+                "..KbbSSSSSSK....",
+                "..KbSSSKSSKSK...",
+                "..KbSSSSBBBBK...",
+                "...KBBBBBBBBK...",
+                "....KbbbbbbK....",
+                "...KWWWWWWWWK...",
+                "..KWWWWwWWWWWK..",
+                ".KCCCCCCCCCCCCK.",
+                ".KCCCCCCCCCCCCK.",
+                "..KSSSSwWWWWWK..",
+                "...KwwwwwwwwK...",
+                "...KWWWWWWWWK...",
+                "...KwwwwwwwwK...",
+                "...KwwwKwwwwK...",
+                "...KwwK..KwwK...",
+                "...KwwK..KwwK...",
+                "...KSSK..KSSK...",
+                "...KssK..KssK...",
+                "...KKKK..KKKK...",
+                "................",
+                "................"
+            ];
+
+            ArtCache.sprites.PLAYER_0 = bakeSprite(playerBase);
+            ArtCache.sprites.PLAYER_1 = bakeSprite(playerRun);
+            ArtCache.sprites.ENEMY_0 = bakeSprite(enemyBase);
+            ArtCache.sprites.HOSTAGE_0 = bakeSprite(hostageTied);
+        }
+        initMicroPixelAssets();
+
+        // Procedural Unique Tree Generator (Selects from pre-rendered high-detail pixel variants)
+        function generateUniqueTree(x, trunkH) {
+            return {
+                x: x,
+                height: trunkH,
+                variant: Math.floor(Math.random() * ArtCache.treeVariants.length),
+                flip: Math.random() > 0.5 ? -1 : 1
+            };
+        }
+
+        function drawUniqueTree(t, floorY) {
+            const img = ArtCache.treeVariants[t.variant];
+            if (!img) return;
+            const scale = t.height / 320;
+            const drawW = img.width * scale;
+            const drawH = img.height * scale;
+            ctx.save();
+            ctx.translate(t.x, floorY - drawH + 8);
+            if (t.flip === -1) {
+                ctx.scale(-1, 1);
+                ctx.drawImage(img, -drawW / 2, 0, drawW, drawH);
+            } else {
+                ctx.drawImage(img, -drawW / 2, 0, drawW, drawH);
+            }
+            ctx.restore();
+        }
+
+        // Smart Pixel Human Sprite Renderer using Pre-Rendered Micro-Pixel Sprites
+        function drawSmartPixelSprite(x, y, facing, type, animFrame = 0) {
+            ctx.save();
+            ctx.translate(Math.floor(x), Math.floor(y));
+            if (facing === -1) {
+                ctx.scale(-1, 1);
+                ctx.translate(-32, 0);
+            }
+
+            if (type === 'PLAYER') {
+                const spr = animFrame ? ArtCache.sprites.PLAYER_1 : ArtCache.sprites.PLAYER_0;
+                ctx.drawImage(spr, 0, 0);
+            } else if (type === 'ENEMY') {
+                // Enemy sprite faces right in grid; flip if needed so rifle points in movement/aim direction
+                ctx.drawImage(ArtCache.sprites.ENEMY_0, 0, 0);
+            } else if (type === 'HOSTAGE') {
+                ctx.drawImage(ArtCache.sprites.HOSTAGE_0, 0, 0);
+            }
+            ctx.restore();
+        }
+
+        class Player {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.w = 32; this.h = 48;
+                this.vx = 0; this.vy = 0;
+                this.speed = 5.2;
+                this.jumpForce = -11.5;
+                this.gravity = 0.5;
+                this.facing = 1;
+                this.isGrounded = false;
+                this.health = 5;
+                this.weapon = 'PISTOL';
+                this.ammo = Infinity;
+                this.fireCooldown = 0;
+                this.invincible = 0;
+                this.isClimbing = false;
+            }
+            update() {
+                if (this.invincible > 0) this.invincible--;
+                let move = 0;
+                if (keys.left) move = -1, this.facing = -1;
+                if (keys.right) move = 1, this.facing = 1;
+
+                // Check Ladder / Climbing
+                let onLadder = false;
+                ladders.forEach(l => {
+                    if (this.x + this.w > l.x && this.x < l.x + 24 &&
+                        this.y + this.h >= l.y && this.y <= l.y + l.h) {
+                        onLadder = true;
+                    }
+                });
+
+                if (onLadder && (keys.up || keys.down)) {
+                    this.isClimbing = true;
+                    this.vy = 0;
+                    if (keys.up) this.y -= 4;
+                    if (keys.down) this.y += 4;
+                } else if (!onLadder) {
+                    this.isClimbing = false;
+                    this.vy += this.gravity;
+                }
+
+                this.vx = move * this.speed;
+                this.x += this.vx;
+                if (!this.isClimbing) this.y += this.vy;
+
+                if (this.x < 10) this.x = 10;
+
+                const floorY = canvas.height - 120;
+                this.isGrounded = false;
+                if (this.y + this.h >= floorY) {
+                    this.y = floorY - this.h;
+                    this.vy = 0;
+                    this.isGrounded = true;
+                }
+
+                platforms.forEach(p => {
+                    if (this.x + this.w > p.x && this.x < p.x + p.w &&
+                        this.y + this.h >= p.y && this.y + this.h <= p.y + 16 && this.vy >= 0) {
+                        this.y = p.y - this.h;
+                        this.vy = 0;
+                        this.isGrounded = true;
+                    }
+                });
+
+                if (keys.jump && (this.isGrounded || this.isClimbing)) {
+                    this.vy = this.jumpForce;
+                    this.isGrounded = false;
+                    this.isClimbing = false;
+                }
+
+                if (this.fireCooldown > 0) this.fireCooldown--;
+                if (keys.shoot && this.fireCooldown === 0) {
+                    this.shoot();
+                }
+
+                if (this.x + canvas.width * 1.5 > maxSpawnX) {
+                    generateChunk(maxSpawnX);
+                    maxSpawnX += 450;
+                }
+            }
+            shoot() {
+                this.fireCooldown = this.weapon === 'HMG' ? 6 : 14;
+                sfx.playShoot();
+                bullets.push({
+                    x: this.x + (this.facing === 1 ? this.w : 0),
+                    y: this.y + 20,
+                    startX: this.x + (this.facing === 1 ? this.w : 0), // Track origin for max range limit
+                    vx: this.facing * 14,
+                    vy: keys.up ? -5 : 0,
+                    isPlayer: true,
+                    dmg: this.weapon === 'SHOTGUN' ? 3 : 1
+                });
+                if (this.weapon !== 'PISTOL') {
+                    this.ammo--;
+                    if (this.ammo <= 0) this.weapon = 'PISTOL', this.ammo = Infinity;
+                    updateHUD();
+                }
+            }
+            draw() {
+                if (this.invincible > 0 && Math.floor(this.invincible / 3) % 2 === 0) return;
+                const moving = Math.abs(this.vx) > 0.5;
+                const anim = moving && Math.floor(Date.now() / 120) % 2 === 0;
+                drawSmartPixelSprite(this.x, this.y, this.facing, 'PLAYER', anim);
+            }
+        }
+
+        let chunkCounter = 0;
+
+        function generateChunk(startX) {
+            chunkCounter++;
+            platforms.push({ x: startX + 40, y: canvas.height - 220, w: 180, h: 20 });
+            platforms.push({ x: startX + 260, y: canvas.height - 310, w: 160, h: 20 });
+
+            // Spawn only high-altitude jet planes
+            if (Math.random() > 0.55) {
+                vehicles.push({
+                    type: 'JET',
+                    x: startX + 150 + Math.random() * 150,
+                    y: canvas.height - 380,
+                    w: 100,
+                    h: 36,
+                    vx: 3.5,
+                    weight: 3200
+                });
+            }
+
+            // Alternate enemy spawns (leave empty space between soldiers so player can shoot them one by one)
+            if (chunkCounter % 2 === 1) {
+                enemies.push({ 
+                    x: startX + 100, 
+                    y: canvas.height - 264, 
+                    w: 28, 
+                    h: 44, 
+                    vx: 1.5, 
+                    minX: startX + 40, 
+                    maxX: startX + 220, 
+                    dir: 1, 
+                    health: 1,
+                    shootCooldown: 60 + Math.floor(Math.random() * 60)
+                });
+            } else {
+                enemies.push({ 
+                    x: startX + 300, 
+                    y: canvas.height - 354, 
+                    w: 28, 
+                    h: 44, 
+                    vx: 1.2, 
+                    minX: startX + 260, 
+                    maxX: startX + 420, 
+                    dir: -1, 
+                    health: 1,
+                    shootCooldown: 60 + Math.floor(Math.random() * 60)
+                });
+            }
+
+            if (Math.random() > 0.25) {
+                hostages.push({ x: startX + 180, y: canvas.height - 168, w: 26, h: 42, freed: false });
+            }
+
+            const structType = Math.floor(Math.random() * 4);
+            backgroundStructures.push({
+                x: startX + (Math.random() * 80),
+                type: structType,
+                width: 150 + Math.random() * 50,
+                height: 160 + Math.random() * 70
+            });
+
+            for (let t = 0; t < 2 + Math.floor(Math.random()*2); t++) {
+                // Taller trees: height increased from 160-220 to 280-380
+                trees.push(generateUniqueTree(startX + t * 150 + Math.random()*40, 280 + Math.random()*100));
+            }
+        }
+
+        window.startGame = function() {
+            sfx.init();
+            score = 0; hostagesRescued = 0; maxSpawnX = 900; chunkCounter = 0;
+            platforms = []; obstacles = []; enemies = []; hostages = []; bullets = []; pickups = []; backgroundStructures = []; trees = []; vehicles = [];
+            player = new Player(50, 100);
+
+            generateChunk(400);
+            generateChunk(900);
+            generateChunk(1400);
+
+            document.getElementById('overlay').classList.add('hidden');
+            gameState = 'PLAYING';
+            updateHUD();
+        };
+
+        function updateHUD() {
+            if (!player) return;
+            document.getElementById('hud-health').innerText = 'HEALTH: ' + '🦹‍♂️'.repeat(Math.max(0, player.health));
+            document.getElementById('hud-weapon').innerText = `WEAPON: ${player.weapon} [${player.ammo === Infinity ? '∞' : player.ammo}]`;
+            document.getElementById('hud-score').innerText = String(score).padStart(6, '0');
+            document.getElementById('hud-hostages').innerText = `POW: 🧔🏼 ${hostagesRescued}`;
+            document.getElementById('dist-val').innerText = Math.floor(player.x / 3);
+        }
+
+        function showAnnouncement(text) {
+            const el = document.getElementById('announcement');
+            document.getElementById('announcement-text').innerText = text;
+            el.classList.remove('opacity-0', 'scale-75');
+            el.classList.add('opacity-100', 'scale-100');
+            setTimeout(() => {
+                el.classList.remove('opacity-100', 'scale-100');
+                el.classList.add('opacity-0', 'scale-75');
+            }, 1500);
+        }
+
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (gameState !== 'PLAYING') return;
+
+            player.update();
+            cameraX = player.x - canvas.width / 3;
+            const floorY = canvas.height - 120;
+
+            // Detailed Multi-Stop Daylight Sky Gradient & Dithered Glowing Sun
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, floorY);
+            skyGrad.addColorStop(0, '#38bdf8');
+            skyGrad.addColorStop(0.55, '#7dd3fc');
+            skyGrad.addColorStop(1, '#bae6fd');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Pixel-art Layered Sun with Corona
+            const sunX = canvas.width - 110;
+            const sunY = 90;
+            ctx.fillStyle = 'rgba(254, 240, 138, 0.35)';
+            ctx.beginPath();
+            ctx.arc(sunX, sunY, 64, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fde047';
+            ctx.beginPath();
+            ctx.arc(sunX, sunY, 44, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fef9c3';
+            ctx.beginPath();
+            ctx.arc(sunX - 8, sunY - 8, 28, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Detailed Micro-Pixel Blue Clouds (Parallax)
+            for (let c = 0; c < 6; c++) {
+                const cx = ((c * 320 - cameraX * 0.2) % (canvas.width + 320) + canvas.width + 320) % (canvas.width + 320) - 160;
+                const cy = 45 + (c % 3) * 35;
+                const cloudImg = ArtCache.cloudSprites[c % ArtCache.cloudSprites.length];
+                if (cloudImg) ctx.drawImage(cloudImg, Math.floor(cx), Math.floor(cy));
+            }
+
+            ctx.save();
+            ctx.translate(-Math.floor(cameraX), 0);
+
+            // Background Houses / Ruins with Detailed Brick & Plank Pixel Textures
+            backgroundStructures.forEach(st => {
+                if (st.x + st.width < cameraX - 100 || st.x > cameraX + canvas.width + 100) return;
+                const hx = Math.floor(st.x);
+                const hy = Math.floor(floorY - st.height);
+                const hw = Math.floor(st.width);
+                const hh = Math.floor(st.height);
+
+                // Base weathered masonry wall
+                ctx.fillStyle = '#292524';
+                if (st.type === 0) {
+                    ctx.fillRect(hx, hy + 40, hw, hh - 40);
+                    // Brick & timber courses
+                    ctx.fillStyle = '#44403c';
+                    for (let by = hy + 46; by < floorY - 6; by += 12) {
+                        for (let bx = hx + 6; bx < hx + hw - 18; bx += 24) {
+                            ctx.fillRect(bx + ((by / 12) % 2) * 8, by, 18, 8);
+                        }
+                    }
+                    // Shingled broken roof
+                    ctx.fillStyle = '#1c1917';
+                    ctx.beginPath();
+                    ctx.moveTo(hx - 10, hy + 40);
+                    ctx.lineTo(hx + hw * 0.4, hy);
+                    ctx.lineTo(hx + hw + 10, hy + 50);
+                    ctx.fill();
+                    // Paned Window with wooden sill/bench
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.fillRect(hx + 30, hy + 70, 30, 40);
+                    ctx.fillStyle = '#1c1917';
+                    ctx.fillRect(hx + 44, hy + 70, 3, 40);
+                    ctx.fillRect(hx + 30, hy + 88, 30, 3);
+                    ctx.fillStyle = '#78350f';
+                    ctx.fillRect(hx + 26, hy + 106, 38, 6);
+                } else if (st.type === 1) {
+                    ctx.fillRect(hx, hy + 20, hw * 0.8, hh - 20);
+                    ctx.fillStyle = '#3f3a36';
+                    for (let by = hy + 28; by < floorY - 8; by += 10) {
+                        ctx.fillRect(hx + 6, by, hw * 0.8 - 12, 6);
+                    }
+                    ctx.fillStyle = '#1c1917';
+                    ctx.beginPath();
+                    ctx.moveTo(hx - 15, hy + 20);
+                    ctx.lineTo(hx + hw * 0.4, hy - 15);
+                    ctx.lineTo(hx + hw * 0.85, hy + 20);
+                    ctx.fill();
+                    // Doorway & Window with bench outside
+                    ctx.fillStyle = '#0c0a09';
+                    ctx.fillRect(hx + hw * 0.3, floorY - 70, 35, 70);
+                    ctx.fillStyle = '#78350f';
+                    ctx.fillRect(hx + 12, floorY - 18, 36, 6);
+                    ctx.fillRect(hx + 16, floorY - 12, 5, 12);
+                    ctx.fillRect(hx + 39, floorY - 12, 5, 12);
+                } else if (st.type === 2) {
+                    ctx.fillRect(hx + 20, hy + 50, 22, hh - 50);
+                    ctx.fillRect(hx + hw - 42, hy + 50, 22, hh - 50);
+                    ctx.fillRect(hx, hy, hw, 50);
+                    ctx.fillStyle = '#44403c';
+                    for (let bx = hx + 8; bx < hx + hw - 16; bx += 22) {
+                        ctx.fillRect(bx, hy + 10, 16, 12);
+                        ctx.fillRect(bx + 4, hy + 28, 16, 12);
+                    }
+                    // Wooden bench under ruin arch
+                    ctx.fillStyle = '#78350f';
+                    ctx.fillRect(hx + 50, floorY - 16, 44, 6);
+                    ctx.fillRect(hx + 55, floorY - 10, 6, 10);
+                    ctx.fillRect(hx + 83, floorY - 10, 6, 10);
+                } else {
+                    ctx.fillRect(hx, hy, 35, hh);
+                    ctx.fillRect(hx + hw - 35, hy + 30, 35, hh - 30);
+                    ctx.fillRect(hx, hy, hw, 30);
+                    ctx.fillStyle = '#7dd3fc';
+                    ctx.fillRect(hx + 35, hy + 50, hw - 70, hh - 50);
+                }
+            });
+
+            // Unique Trees
+            trees.forEach(t => {
+                if (t.x > cameraX - 200 && t.x < cameraX + canvas.width + 200) {
+                    drawUniqueTree(t, floorY);
+                }
+            });
+
+            // Seamless Micro-Pixel Textured Brown Earth Ground
+            if (ArtCache.groundTile) {
+                const tileW = ArtCache.groundTile.width;
+                const firstTileX = Math.floor(cameraX / tileW) * tileW;
+                for (let gx = firstTileX; gx < cameraX + canvas.width + tileW; gx += tileW) {
+                    ctx.drawImage(ArtCache.groundTile, gx, floorY);
+                }
+            }
+
+            // Wooden Platforms & Benches with Wood Grain, Rivets & Cross-Bracing
+            platforms.forEach(p => {
+                if (p.x + p.w > cameraX - 100 && p.x < cameraX + canvas.width + 100) {
+                    const px = Math.floor(p.x);
+                    const py = Math.floor(p.y);
+                    // Support legs with shaded edges
+                    ctx.fillStyle = '#3e2723';
+                    ctx.fillRect(px + 12, py + p.h, 12, floorY - (py + p.h));
+                    ctx.fillRect(px + p.w - 24, py + p.h, 12, floorY - (py + p.h));
+                    ctx.fillStyle = '#5d4037';
+                    ctx.fillRect(px + 14, py + p.h, 4, floorY - (py + p.h));
+                    ctx.fillRect(px + p.w - 22, py + p.h, 4, floorY - (py + p.h));
+
+                    // Main plank deck with dark border
+                    ctx.fillStyle = '#271710';
+                    ctx.fillRect(px, py, p.w, p.h);
+                    ctx.fillStyle = '#8b5a2b';
+                    ctx.fillRect(px + 2, py + 2, p.w - 4, p.h - 4);
+                    // Top sunlit wood highlight & plank seams
+                    ctx.fillStyle = '#b07d4f';
+                    ctx.fillRect(px + 2, py + 2, p.w - 4, 4);
+                    ctx.fillStyle = '#4a2e18';
+                    for (let sx = px + 28; sx < px + p.w - 10; sx += 28) {
+                        ctx.fillRect(sx, py + 2, 2, p.h - 4);
+                        ctx.fillRect(sx - 4, py + 8, 2, 2); // Iron nail
+                    }
+                }
+            });
+
+            // Moving Heavy Military Vehicles (Detailed Pixel-Art Trucks, Battle Tanks & Jets)
+            vehicles.forEach(v => {
+                v.x += v.vx;
+                if (v.x + v.w < cameraX - 150 || v.x > cameraX + canvas.width + 150) return;
+                const vx = Math.floor(v.x);
+                const vy = Math.floor(v.y);
+
+                if (v.type === 'TRUCK') {
+                    // Chassis & Olive Bed
+                    ctx.fillStyle = '#1a2e05';
+                    ctx.fillRect(vx, vy + 24, v.w, v.h - 24);
+                    ctx.fillStyle = '#365314';
+                    ctx.fillRect(vx + 2, vy + 26, v.w - 4, v.h - 28);
+                    // Armored Cab
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(vx + v.w - 28, vy + 4, 28, v.h - 4);
+                    ctx.fillStyle = '#38bdf8'; // Windshield with glare
+                    ctx.fillRect(vx + v.w - 22, vy + 8, 18, 12);
+                    ctx.fillStyle = '#bae6fd';
+                    ctx.fillRect(vx + v.w - 20, vy + 10, 6, 8);
+                    // Ribbed Canvas Cover (Metal Slug style)
+                    ctx.fillStyle = '#d6d3d1';
+                    ctx.fillRect(vx + 4, vy + 2, v.w - 32, 26);
+                    ctx.fillStyle = '#a8a29e';
+                    for (let rx = vx + 12; rx < vx + v.w - 34; rx += 10) {
+                        ctx.fillRect(rx, vy + 4, 3, 24);
+                    }
+                    // Red Cross / X Decal
+                    ctx.fillStyle = '#dc2626';
+                    ctx.fillRect(vx + 22, vy + 9, 14, 14);
+                    ctx.fillStyle = '#f5f5f4';
+                    ctx.fillRect(vx + 25, vy + 12, 8, 8);
+                    // Pixel Tires with Hubcaps
+                    [vx + 16, vx + 36, vx + v.w - 14].forEach(wx => {
+                        ctx.fillStyle = '#090d16';
+                        ctx.fillRect(wx - 9, vy + v.h - 8, 18, 16);
+                        ctx.fillStyle = '#57534e';
+                        ctx.fillRect(wx - 4, vy + v.h - 3, 8, 6);
+                    });
+                } else if (v.type === 'TANK') {
+                    // Treads with individual links
+                    ctx.fillStyle = '#1c1917';
+                    ctx.fillRect(vx, vy + 28, v.w, v.h - 24);
+                    ctx.fillStyle = '#57534e';
+                    for (let tx = vx + 4; tx < vx + v.w - 6; tx += 12) {
+                        ctx.fillRect(tx, vy + 32, 8, 12);
+                    }
+                    // Sloped Armored Hull
+                    ctx.fillStyle = '#44403c';
+                    ctx.fillRect(vx + 6, vy + 12, v.w - 12, 20);
+                    ctx.fillStyle = '#78716c';
+                    ctx.fillRect(vx + 8, vy + 14, v.w - 16, 5);
+                    // Domed Turret & Heavy Cannon
+                    ctx.fillStyle = '#292524';
+                    ctx.fillRect(vx + 22, vy - 4, 38, 18);
+                    ctx.fillStyle = '#57534e';
+                    ctx.fillRect(vx + 26, vy - 2, 30, 5);
+                    ctx.fillStyle = '#1c1917';
+                    ctx.fillRect(vx - 16, vy + 2, 40, 8);
+                    ctx.fillRect(vx - 20, vy, 6, 12); // Muzzle brake
+                } else if (v.type === 'JET') {
+                    // Afterburner flame
+                    ctx.fillStyle = Math.random() > 0.5 ? '#f97316' : '#fde047';
+                    ctx.fillRect(vx - 14, vy + 14, 16, 8);
+                    // Fuselage
+                    ctx.fillStyle = '#0369a1';
+                    ctx.fillRect(vx, vy + 12, v.w - 16, 14);
+                    ctx.fillStyle = '#0284c7';
+                    ctx.fillRect(vx + 8, vy + 10, v.w - 12, 8);
+                    // Nose cone & Canopy
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.fillRect(vx + v.w - 36, vy + 6, 22, 6);
+                    // Swept Wings & Tail Fin
+                    ctx.fillStyle = '#075985';
+                    ctx.fillRect(vx + 32, vy - 8, 22, 44);
+                    ctx.fillRect(vx + 4, vy - 4, 14, 18);
+                }
+            });
+
+            // Unique Trees
+            trees.forEach(t => {
+                if (t.x > cameraX - 200 && t.x < cameraX + canvas.width + 200) {
+                    drawUniqueTree(t, floorY);
+                }
+            });
+
+            // Earth Brown Ground
+            ctx.fillStyle = '#4a2e18';
+            ctx.fillRect(cameraX, floorY, canvas.width * 2, 150);
+            ctx.fillStyle = '#5c3a21';
+            ctx.fillRect(cameraX, floorY, canvas.width * 2, 14);
+
+            // Wooden Platforms & Benches (Restored full rendering loop so they never disappear)
+            platforms.forEach(p => {
+                if (p.x + p.w > cameraX - 100 && p.x < cameraX + canvas.width + 100) {
+                    // Support legs
+                    ctx.fillStyle = '#5c3a21';
+                    ctx.fillRect(p.x + 12, p.y + p.h, 10, floorY - (p.y + p.h));
+                    ctx.fillRect(p.x + p.w - 22, p.y + p.h, 10, floorY - (p.y + p.h));
+                    // Main plank deck
+                    ctx.fillStyle = '#8b5a2b';
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    // Top highlight trim
+                    ctx.fillStyle = '#a47148';
+                    ctx.fillRect(p.x, p.y, p.w, 5);
+                }
+            });
+
+            // Moving Air Force Jets (Tanks and moving green ground structures removed)
+            vehicles.forEach(v => {
+                v.x += v.vx;
+
+                if (v.type === 'JET') {
+                    ctx.fillStyle = '#0284c7'; // Air Force Jet body
+                    ctx.beginPath();
+                    ctx.moveTo(v.x, v.y + 18);
+                    ctx.lineTo(v.x + v.w, v.y + 6);
+                    ctx.lineTo(v.x + v.w, v.y + 30);
+                    ctx.fill();
+                    // Wings
+                    ctx.fillStyle = '#0369a1';
+                    ctx.fillRect(v.x + 30, v.y - 12, 24, 48);
+                }
+            });
+
+            // POW Hostages
+            hostages.forEach(h => {
+                if (!h.freed) {
+                    drawSmartPixelSprite(h.x, h.y, 1, 'HOSTAGE');
+                } else {
+                    ctx.fillStyle = '#6e7f68';
+                    ctx.fillRect(h.x, h.y, h.w, h.h);
+                }
+            });
+
+            // Enemies (Patrolling & Actively Shooting at Perfect)
+            enemies.forEach(e => {
+                e.x += e.vx * e.dir;
+                if (e.x < e.minX || e.x > e.maxX) e.dir *= -1;
+
+                // Enemy shooting AI logic towards player - Now requires being on the same height level (Y-axis proximity)
+                e.shootCooldown--;
+                if (e.shootCooldown <= 0 && Math.abs(player.x - e.x) < 450 && Math.abs(player.y - e.y) < 60) {
+                    e.shootCooldown = 90 + Math.floor(Math.random() * 60);
+                    const angleDir = player.x > e.x ? 1 : -1;
+                    e.dir = angleDir;
+                    sfx.playShoot();
+                    const spawnX = e.x + (angleDir === 1 ? e.w : 0);
+                    bullets.push({
+                        x: spawnX,
+                        y: e.y + 18,
+                        startX: spawnX, // Track origin for max range limit
+                        vx: angleDir * 8,
+                        vy: 0,
+                        isPlayer: false,
+                        dmg: 1
+                    });
+                }
+
+                drawSmartPixelSprite(e.x, e.y, e.dir, 'ENEMY');
+            });
+
+            // Pickups
+            pickups.forEach((pk, idx) => {
+                ctx.fillStyle = pk.type === 'HMG' ? '#f59e0b' : '#06b6d4';
+                ctx.beginPath();
+                ctx.roundRect(pk.x, pk.y, 28, 28, 6);
+                ctx.fill();
+
+                if (player.x + player.w > pk.x && player.x < pk.x + 28 &&
+                    player.y + player.h > pk.y && player.y < pk.y + 28) {
+                    player.weapon = pk.type;
+                    player.ammo = pk.type === 'HMG' ? 150 : 40;
+                    showAnnouncement(pk.type === 'HMG' ? "HEAVY MACHINE GUN!" : "SHOTGUN!");
+                    sfx.playPowerup();
+                    pickups.splice(idx, 1);
+                    updateHUD();
+                }
+            });
+
+            // Bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i];
+                b.x += b.vx; b.y += b.vy;
+                ctx.fillStyle = b.isPlayer ? '#fef08a' : '#ff2a2a';
+                ctx.fillRect(b.x, b.y, 8, 5);
+
+                let removed = false;
+                if (b.isPlayer) {
+                    hostages.forEach(h => {
+                        if (!h.freed && b.x > h.x && b.x < h.x + h.w && b.y > h.y && b.y < h.y + h.h) {
+                            h.freed = true;
+                            hostagesRescued++;
+                            score += 1000;
+                            pickups.push({ x: h.x, y: h.y + 10, type: Math.random() > 0.4 ? 'HMG' : 'SHOTGUN' });
+                            showAnnouncement("THANK YOU PERFECT! (+1000 PTS)");
+                            sfx.playPowerup();
+                            updateHUD();
+                            removed = true;
+                        }
+                    });
+                    enemies.forEach((e, ei) => {
+                        if (b.x > e.x && b.x < e.x + e.w && b.y > e.y && b.y < e.y + e.h) {
+                            e.health -= b.dmg;
+                            removed = true;
+                            if (e.health <= 0) {
+                                enemies.splice(ei, 1);
+                                score += 200;
+                                updateHUD();
+                            }
+                        }
+                    });
+                } else {
+                    if (b.x > player.x && b.x < player.x + player.w && b.y > player.y && b.y < player.y + player.h) {
+                        if (player.invincible === 0) {
+                            player.health--;
+                            player.invincible = 60;
+                            sfx.playExplosion();
+                            updateHUD();
+                            if (player.health <= 0) {
+                                gameState = 'GAMEOVER';
+                                document.getElementById('overlay').innerHTML = `
+                                    <div class="max-w-md w-full bg-stone-900 border-4 border-red-500 rounded-3xl p-6 text-center shadow-2xl">
+                                        <h1 class="text-xl sm:text-2xl text-red-500 mb-3">MISSION FAILED</h1>
+                                        <p class="text-gray-300 text-xs mb-5">Score: ${score} | POW Rescued: ${hostagesRescued} | Distance: ${Math.floor(player.x/3)}m</p>
+                                        <button onclick="window.startGame()" class="arcade-btn text-xs text-white px-6 py-4 rounded-2xl w-full cursor-pointer">TRY AGAIN</button>
+                                    </div>
+                                `;
+                                document.getElementById('overlay').classList.remove('hidden');
+                            }
+                        }
+                        removed = true;
+                    }
+                }
+
+                // Bullet travels across full screen distance before disappearing
+                if (removed || Math.abs(b.x - b.startX) > canvas.width * 1.2) {
+                    bullets.splice(i, 1);
+                }
+            }
+
+            player.draw();
+            ctx.restore();
+        }
+
+        // Keyboard Controls
+        window.addEventListener('keydown', e => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+            if (e.code === 'ArrowUp' || e.code === 'KeyW') { keys.up = true; keys.jump = true; }
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = true;
+            if (e.code === 'Space') keys.jump = true;
+            if (e.code === 'KeyF' || e.code === 'KeyJ') keys.shoot = true;
+        });
+        window.addEventListener('keyup', e => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+            if (e.code === 'ArrowUp' || e.code === 'KeyW') { keys.up = false; keys.jump = false; }
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = false;
+            if (e.code === 'Space') keys.jump = false;
+            if (e.code === 'KeyF' || e.code === 'KeyJ') keys.shoot = false;
+        });
+
+        // Touch Controls
+        const bindTouch = (id, key) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; sfx.init(); });
+            el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
+            el.addEventListener('mousedown', () => { keys[key] = true; sfx.init(); });
+            el.addEventListener('mouseup', () => { keys[key] = false; });
+        };
+        bindTouch('btn-left', 'left');
+        bindTouch('btn-right', 'right');
+        bindTouch('btn-jump', 'jump');
+        bindTouch('btn-shoot', 'shoot');
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
